@@ -9,7 +9,7 @@ import (
 
 // Message represents a single chat message with metadata.
 type Message struct {
-	// NOTE: `json:".."` annotations struct tags that control how struct fields are
+	// NOTE: `json:".."` are annotations struct tags that control how struct fields are
 	// serialized to and deserialized from JSON.
 	// Each `json:"fieldname"` tag specifies the key name used in the resulting JSON
 	// output, instead of using the Go struct field name directly.
