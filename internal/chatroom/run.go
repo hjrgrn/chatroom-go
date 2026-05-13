@@ -35,6 +35,7 @@ func NewChatRoom(dataDir string) (*ChatRoom, error) {
 }
 
 func (cr *ChatRoom) periodicSnapshot() {
+	// TODO: make ticker configurable for testing purpose.
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
@@ -47,6 +48,30 @@ func (cr *ChatRoom) periodicSnapshot() {
 			if err := cr.createSnapshot(); err != nil {
 				fmt.Printf("Snapshot failed: %v\n", err)
 			}
+		}
+	}
+}
+
+func (cr *ChatRoom) Run() {
+	fmt.Println("ChatRoom heartbeat started..")
+	go cr.CleanupInactiveClients()
+
+	for {
+		select {
+		case client := <-cr.join:
+			cr.HandleJoin(client)
+
+		case client := <-cr.leave:
+			cr.HandleLeave(client)
+
+		case message := <-cr.broadcast:
+			cr.HandleBroadcast(message)
+
+		case client := <-cr.listUsers:
+			cr.sendUserList(client)
+
+		case dm := <-cr.directMessage:
+			cr.handleDirectMessage(dm)
 		}
 	}
 
