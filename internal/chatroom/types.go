@@ -36,6 +36,7 @@ type Client struct {
 // ChatRoom is the central coordinator.
 type ChatRoom struct {
 	// Communication channels.
+	// Not buffered to ensure synchronization.
 	join          chan *Client
 	leave         chan *Client
 	broadcast     chan string
