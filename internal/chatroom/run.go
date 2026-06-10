@@ -87,7 +87,7 @@ func (cr *ChatRoom) Run() {
 func runServer() {
 	chatRoom, err := NewChatRoom("./instance")
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to launch the server: %v", err)
+		fmt.Fprintf(os.Stderr, "Failed to launch the server: %v\n", err)
 		return
 	}
 	defer chatRoom.shutdown()
@@ -107,7 +107,7 @@ func runServer() {
 
 	listener, err := net.Listen("tcp", ":9000")
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to launch the server: %v", err)
+		fmt.Fprintf(os.Stderr, "Failed to launch the server: %v\n", err)
 		return
 	}
 	defer listener.Close()
@@ -117,10 +117,10 @@ func runServer() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error accepting connection: %v", err)
+			fmt.Fprintf(os.Stderr, "Error accepting connection: %v\n", err)
 			continue
 		}
-		fmt.Println("New connection accepted from: %v", conn.RemoteAddr())
+		fmt.Printf("New connection accepted from: %v\n", conn.RemoteAddr())
 		go handleClient(conn, chatRoom)
 	}
 }
@@ -128,7 +128,7 @@ func runServer() {
 func (cr *ChatRoom) shutdown() {
 	fmt.Println("\nShutting down...")
 	if err := cr.createSnapshot(); err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to create a snapshot: %v", err)
+		fmt.Fprintf(os.Stderr, "Failed to create a snapshot: %v\n", err)
 	}
 	if cr.walFile != nil {
 		cr.walFile.Close()

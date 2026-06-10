@@ -13,7 +13,7 @@ import (
 func handleClient(conn net.Conn, chatroom *ChatRoom) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Fprintln(os.Stderr, "Panic in handleClient: %v", r)
+			fmt.Fprintf(os.Stderr, "Panic in handleClient: %v\n", r)
 			conn.Close()
 		}
 	}()
@@ -28,7 +28,7 @@ func handleClient(conn net.Conn, chatroom *ChatRoom) {
 
 	input, err := reader.ReadString('\n')
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to read username: %v", err)
+		fmt.Fprintf(os.Stderr, "Failed to read username: %v\n", err)
 		return
 	}
 	input = strings.TrimSpace(input)
