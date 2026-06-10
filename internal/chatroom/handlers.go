@@ -19,3 +19,7 @@ func (cr *ChatRoom) sendUserList(client *Client) {
 func (cr *ChatRoom) handleDirectMessage(message DirectMessage) {
 	// TODO:
 }
+
+func (c *Client) markActive() {
+	// TODO:
+}

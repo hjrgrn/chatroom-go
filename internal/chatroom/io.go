@@ -3,11 +3,14 @@ package chatroom
 import (
 	"bufio"
 	"fmt"
+	"go/format"
 	"math/rand"
 	"net"
 	"os"
 	"strings"
 	"time"
+
+	"golang.org/x/tools/go/analysis/passes/ifaceassert"
 )
 
 func handleClient(conn net.Conn, chatroom *ChatRoom) {
@@ -135,9 +138,52 @@ func buildWelcomeMessage(username string) string {
 }
 
 func readMessages(client *Client, chatRoom *ChatRoom) {
-	// TODO:
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "Panic in readMessagesfor %s: %v\n", client.username, r)
+		}
+	}()
+
+	reader := bufio.NewReader(client.conn)
+
+	for {
+		// Set 5 minute idle timeout.
+		client.conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
+
+		message, err := reader.ReadString('\n')
+		if err != nil {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				fmt.Printf("%s timed out.\n", client.username)
+			} else {
+				fmt.Printf("%s disconnected.\n", client.username)
+			}
+			return
+		}
+
+		client.markActive() // Update activity timestamp.
+
+		message = strings.TrimSpace(message)
+		if message == "" {
+			continue
+		}
+
+		client.mu.Lock()
+		client.messagesRecv++
+		client.mu.Unlock()
+
+		// Process commands VS regular messages.
+		if strings.HasPrefix(message, "/") {
+			handleCommand(client, chatRoom, message)
+			continue
+		}
+
+		formatted := fmt.Sprintf("[%s]: %s\n", client.username, message)
+		chatRoom.broadcast <- formatted
+	}
 }
 
 func writeMessages(client *Client) {
 	// TODO:
 }
+
+func handleCommand(client *Client, chatRoom *ChatRoom, command string) {}
