@@ -19,6 +19,7 @@ func handleClient(conn net.Conn, chatroom *ChatRoom) {
 	}()
 
 	// Set initial timeout for username entry.
+	// TODO: make it configurable for testing
 	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 
 	reader := bufio.NewReader(conn)
@@ -151,6 +152,7 @@ func readMessages(client *Client, chatRoom *ChatRoom) {
 
 	for {
 		// Set 5 minute idle timeout.
+		// TODO: make it configurable for testing
 		client.conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
 
 		message, err := reader.ReadString('\n')
@@ -186,7 +188,33 @@ func readMessages(client *Client, chatRoom *ChatRoom) {
 }
 
 func writeMessages(client *Client) {
-	// TODO:
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "Panic in writeMessages for %s: %v\n", client.username, r)
+		}
+	}()
+
+	writer := bufio.NewWriter(client.conn)
+
+	for msg := range client.outgoing {
+		// Simulate slow client (testing mode)
+		if client.isSlowClient {
+			time.Sleep(time.Duration(rand.Intn(500)) * time.Millisecond)
+		}
+
+		_, err := writer.WriteString(msg)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Write error for %s: %v\n", client.username, err)
+			return
+		}
+
+		err = writer.Flush()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Flush error for %s: %v\n", client.username, err)
+			return
+		}
+	}
+
 }
 
 func handleCommand(client *Client, chatRoom *ChatRoom, command string) {}
