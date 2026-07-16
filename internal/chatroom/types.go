@@ -30,7 +30,7 @@ type Client struct {
 	messagesRecv   int         //
 	isSlowClient   bool        // Test flag.
 	reconnectToken string      //
-	mu             sync.Mutex  // Protects stats fields
+	mu             sync.Mutex  // Protects stats fields.
 }
 
 // ChatRoom is the central coordinator.

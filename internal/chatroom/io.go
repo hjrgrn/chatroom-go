@@ -3,14 +3,11 @@ package chatroom
 import (
 	"bufio"
 	"fmt"
-	"go/format"
 	"math/rand"
 	"net"
 	"os"
 	"strings"
 	"time"
-
-	"golang.org/x/tools/go/analysis/passes/ifaceassert"
 )
 
 func handleClient(conn net.Conn, chatroom *ChatRoom) {
@@ -64,7 +61,7 @@ func handleClient(conn net.Conn, chatroom *ChatRoom) {
 	if isReconnectiong {
 		if chatroom.validateReconnectToken(username, reconnectToken) {
 			fmt.Printf("%s reconnected successfully.\n", username)
-			conn.Write([]byte(fmt.Sprintf("Welcome back, %s!\n", username)))
+			fmt.Fprintf(conn, fmt.Sprintf("Welcome back, %s!\n", username))
 		} else {
 			conn.Write([]byte("Invalid token or session expired.\n"))
 			return
@@ -72,7 +69,7 @@ func handleClient(conn net.Conn, chatroom *ChatRoom) {
 	} else {
 		// Prevent duplicate logins.
 		if chatroom.isUsernameConnected(username) {
-			conn.Write([]byte(fmt.Sprintf("User %s is already connected. Use \"reconnect\" if you lost connection.\n", username)))
+			fmt.Fprintf(conn, "User %s is already connected. Use \"reconnect\" if you lost connection.\n", username)
 			return
 		}
 
@@ -83,25 +80,31 @@ func handleClient(conn net.Conn, chatroom *ChatRoom) {
 
 		// TODO: this should be in the critical section?
 		if existingSession != nil {
-			token := existingSession.ReconnectToken
-			msg := fmt.Sprintf("Tip: save the token: %s\n", token)
-			msg += fmt.Sprintf("To reconnect type:\nreconnect:%s:%s\n", username, token)
-			conn.Write([]byte(msg))
+			// BUG:
+			// token := existingSession.ReconnectToken
+			reconnectToken = existingSession.ReconnectToken
+			// BUG:
+			// fmt.Fprintf(conn, "Tip: save the token: %s\nTo reconnect type:\nreconnect:%s:%s\n", token, username, token)
+			fmt.Fprintf(conn, "Tip: save the token: %s\nTo reconnect type:\nreconnect:%s:%s\n", reconnectToken, username, reconnectToken)
 		} else {
 			session := chatroom.createSession(username)
-			token := session.ReconnectToken
-			msg := fmt.Sprintf("Tip: save this token:\n%s\n", token)
-			msg += fmt.Sprintf("To reconnect type:\nreconnect:%s:%s\n")
-			conn.Write([]byte(msg))
+			// BUG:
+			// token := session.ReconnectToken
+			reconnectToken = session.ReconnectToken
+			// BUG:
+			// fmt.Fprintf(conn, "Tip: save this token:\n%s\nTo reconnect type:\nreconnect:%s:%s\n", token, username, token)
+			fmt.Fprintf(conn, "Tip: save this token:\n%s\nTo reconnect type:\nreconnect:%s:%s\n", reconnectToken, username, reconnectToken)
 		}
 	}
 
 	// Create client object.
 	client := &Client{
-		conn:           conn,
-		username:       username,
-		outgoing:       make(chan string, 10), // Buffered.
-		lastActive:     time.Now(),
+		conn:       conn,
+		username:   username,
+		outgoing:   make(chan string, 10), // Buffered.
+		lastActive: time.Now(),
+		// TODO: why having reconnectToken here, if we already have it in session?
+		// this needs further examination, refer to previous `BUG:`s.
 		reconnectToken: reconnectToken,
 		isSlowClient:   rand.Float64() < 0.1, // less then 10% chance for testing.
 	}
