@@ -187,6 +187,7 @@ func readMessages(client *Client, chatRoom *ChatRoom) {
 	}
 }
 
+// TODO: this could be a method on Client
 func writeMessages(client *Client) {
 	defer func() {
 		if r := recover(); r != nil {
