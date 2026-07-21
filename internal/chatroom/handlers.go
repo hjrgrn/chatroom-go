@@ -26,7 +26,24 @@ func (cr *ChatRoom) sendHistory(client *Client, count int) {
 }
 
 func (cr *ChatRoom) HandleLeave(client *Client) {
-	// TODO:
+	cr.mu.Lock()
+	if !cr.clients[client] {
+		cr.mu.Unlock()
+		return
+	}
+	delete(cr.clients, client)
+	cr.mu.Unlock()
+
+	fmt.Printf("%s left (total: %d)\n", client.username, len(cr.clients))
+
+	// Close channel safely
+	select {
+	case <-client.outgoing:
+	default:
+		close(client.outgoing)
+	}
+
+	cr.HandleBroadcast(fmt.Sprintf("*** %s left the chat ***\n", client.username))
 }
 
 func (cr *ChatRoom) HandleBroadcast(message string) {
