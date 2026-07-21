@@ -8,6 +8,20 @@ import (
 )
 
 func (cr *ChatRoom) HandleJoin(client *Client) {
+	cr.mu.Lock()
+	cr.clients[client] = true
+	cr.mu.Unlock()
+
+	client.markActive()
+
+	fmt.Printf("%s joined (total: %d)\n", client.username, len(cr.clients))
+
+	cr.sendHistory(client, 10)
+
+	cr.HandleBroadcast(fmt.Sprintf("*** %s joined the chat ***\n", client.username))
+}
+
+func (cr *ChatRoom) sendHistory(client *Client, count int) {
 	// TODO:
 }
 
