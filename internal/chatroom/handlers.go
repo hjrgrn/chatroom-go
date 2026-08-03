@@ -3,6 +3,7 @@ package chatroom
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -22,7 +23,30 @@ func (cr *ChatRoom) HandleJoin(client *Client) {
 }
 
 func (cr *ChatRoom) sendHistory(client *Client, count int) {
-	// TODO:
+	cr.messageMu.Lock()
+	defer cr.messageMu.Unlock()
+
+	length := len(cr.messages)
+	start := max(length-count, 0)
+
+	var historyMsgBuilder strings.Builder
+	historyMsgBuilder.WriteString("Recent Messages:\n")
+
+	for i := start; i < length; i++ {
+		msg := cr.messages[i]
+		historyMsgBuilder.WriteString("[")
+		historyMsgBuilder.WriteString(msg.From)
+		historyMsgBuilder.WriteString("]: ")
+		historyMsgBuilder.WriteString(msg.Content)
+		historyMsgBuilder.WriteString("\n")
+	}
+	historyMsg := historyMsgBuilder.String()
+
+	select {
+	case client.outgoing <- historyMsg:
+	default:
+	}
+
 }
 
 func (cr *ChatRoom) HandleLeave(client *Client) {
@@ -101,13 +125,64 @@ func (cr *ChatRoom) HandleBroadcast(message string) {
 }
 
 func (cr *ChatRoom) sendUserList(client *Client) {
-	// TODO:
+	cr.mu.Lock()
+	defer cr.mu.Unlock()
+
+	var listBuilder strings.Builder
+	for c := range cr.clients {
+		listBuilder.WriteString(" - ")
+		listBuilder.WriteString(c.username)
+		if c.isInactive(1 * time.Minute) {
+			listBuilder.WriteString(" (idle)")
+		}
+		listBuilder.WriteString("\n")
+	}
+
+	listBuilder.WriteString("\nTotalMessages: ")
+	listBuilder.WriteString(strconv.Itoa(cr.totalMessages))
+	listBuilder.WriteString("\nUptime: ")
+	listBuilder.WriteString(time.Since(cr.startTime).Round(time.Second).String())
+	list := listBuilder.String()
+
+	select {
+	case client.outgoing <- list:
+	default:
+	}
 }
 
-func (cr *ChatRoom) handleDirectMessage(message DirectMessage) {
-	// TODO:
+func (cr *ChatRoom) handleDirectMessage(dm DirectMessage) {
+	select {
+	case dm.toClient.outgoing <- dm.message:
+		dm.toClient.mu.Lock()
+		dm.toClient.messagesSent++
+		dm.toClient.mu.Unlock()
+	default:
+		fmt.Fprintf(os.Stderr, "Couldn't deliver DM to %s\n", dm.toClient.username)
+	}
+
+}
+
+func (cr *ChatRoom) findClientByUsername(username string) *Client {
+	cr.mu.Lock()
+	defer cr.mu.Unlock()
+
+	for client := range cr.clients {
+		if client.username == username {
+			return client
+		}
+	}
+	return nil
+
 }
 
 func (c *Client) markActive() {
-	// TODO:
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.lastActive = time.Now()
+}
+
+func (c *Client) isInactive(timeout time.Duration) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return time.Since(c.lastActive) > timeout
 }
