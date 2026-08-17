@@ -95,5 +95,5 @@ func (cr *ChatRoom) persistMessage(msg Message) error {
 		return err
 	}
 
-	return nil
+	return cr.walFile.Sync()
 }
