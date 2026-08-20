@@ -4,13 +4,62 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
-	"path/filepath"
 )
 
 func (cr *ChatRoom) createSnapshot() error {
-	// TODO:
+	snapshotPath := cr.getSnapshotPath()
+	tmpPath := snapshotPath + ".tmp"
+
+	file, err := os.Create(tmpPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	cr.messageMu.Lock()
+	data, err := json.MarshalIndent(cr.messages, "", "	")
+	cr.messageMu.Unlock()
+
+	if err != nil {
+		return err
+	}
+
+	if _, err := file.Write(data); err != nil {
+		return err
+	}
+
+	if err := file.Sync(); err != nil {
+		return err
+	}
+
+	file.Close()
+
+	if err := os.Rename(tmpPath, snapshotPath); err != nil {
+		return err
+	}
+
+	fmt.Printf("Snapshot created (%d messages)\n", len(cr.messages))
+	return cr.truncateWAL()
+}
+
+func (cr *ChatRoom) truncateWAL() error {
+	cr.walMu.Lock()
+	defer cr.walMu.Unlock()
+
+	if cr.walFile != nil {
+		cr.walFile.Close()
+	}
+
+	walPath := cr.getWALPath()
+	file, err := os.OpenFile(walPath, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	cr.walFile = file
+	fmt.Println("WAL truncated")
 	return nil
 }
 
@@ -19,7 +68,7 @@ func (cr *ChatRoom) initializePersistence() error {
 		return fmt.Errorf("create data dir: %w", err)
 	}
 
-	walPath := filepath.Join(cr.dataDir, "messages.wal")
+	walPath := cr.getWALPath()
 	if err := cr.recoverFromWAL(walPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Recovery failed: %v\n", err)
 	}
@@ -76,7 +125,36 @@ func (cr *ChatRoom) recoverFromWAL(walPath string) error {
 }
 
 func (cr *ChatRoom) loadSnapshot() error {
-	// TODO:
+	snapshotPath := cr.getSnapshotPath()
+	file, err := os.Open(snapshotPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return err
+	}
+
+	cr.messageMu.Lock()
+	err = json.Unmarshal(data, &cr.messages)
+	cr.messageMu.Unlock()
+
+	if err != nil {
+		return err
+	}
+
+	for _, msg := range cr.messages {
+		if msg.ID >= cr.nextMessageID {
+			cr.nextMessageID = msg.ID + 1
+		}
+	}
+
+	fmt.Printf("Loaded %d messages from snapshot\n", len(cr.messages))
 	return nil
 }
 
